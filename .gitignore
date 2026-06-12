@@ -1,0 +1,7 @@
+node_modules
+dist
+*.log
+
+# Local secrets / config (incl. .env.bak) — keep .env.example tracked.
+.env*
+!.env.example
