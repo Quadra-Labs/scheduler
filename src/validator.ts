@@ -2,7 +2,7 @@ import type { Signer } from '@mysten/sui/cryptography';
 import type { DataLayer } from 'quadra-data';
 
 import type { EvalEngine } from './config.js';
-import { buildPayload, callEvalValidate } from './evaluation.js';
+import { buildPayload, callEvalValidate, callEvalStartData } from './evaluation.js';
 
 export interface ValidatorOptions {
     /** Dedicated Seal-reader key (the `set_scheduler` address), not the data
@@ -21,6 +21,8 @@ export interface ValidatorStatus {
 export interface Verdict {
     valid: boolean;
     reason?: string;
+    /** Start data captured at delivery (e.g. `{ start_price }`); present when valid. */
+    start_data?: Record<string, unknown>;
 }
 
 /**
@@ -49,11 +51,13 @@ export class ValidatorEngine {
     }
 
     /**
-     * Validate one delivered job. Rejections (`valid: false`) are final agent
-     * faults; transient problems (no result indexed yet, decrypt/key-server or
-     * eval-engine outage) throw so the caller can retry.
+     * Validate one delivered job and, when valid, fetch the start data (price at
+     * delivery) from the same eval engine for intake to record. Rejections
+     * (`valid: false`) are final agent faults; transient problems (no result
+     * indexed yet, decrypt/key-server or eval-engine outage) throw so the caller
+     * can retry.
      */
-    async validate(jobId: string): Promise<Verdict> {
+    async validate(jobId: string, asset: string): Promise<Verdict> {
         const result = await this.#dl.jobResults.decrypt(jobId, this.#opts.schedulerKey);
 
         const evaluatorId = result.job.template.evaluator_id;
@@ -63,14 +67,17 @@ export class ValidatorEngine {
             return { valid: false, reason: `no eval engine for '${evaluatorId}'` };
         }
 
-        const verdict = await callEvalValidate(engine.url, buildPayload(jobId, result));
-        if (verdict.valid) {
-            this.#counts.validated++;
-            console.log(`[validator] ${jobId} valid`);
-        } else {
+        const verdict = await callEvalValidate(engine.url, buildPayload(jobId, result, asset));
+        if (!verdict.valid) {
             this.#counts.rejected++;
             console.warn(`[validator] ${jobId} rejected: ${verdict.reason}`);
+            return verdict;
         }
-        return verdict;
+
+        // Snapshot the start price at delivery (the job's started_at moment).
+        const start_data = await callEvalStartData(engine.url, asset, result.started_at);
+        this.#counts.validated++;
+        console.log(`[validator] ${jobId} valid; start_data ${JSON.stringify(start_data)}`);
+        return { valid: true, start_data };
     }
 }

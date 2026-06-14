@@ -51,7 +51,7 @@ async function main(): Promise<void> {
             return;
         }
         validator
-            .validate(String(req.body.job_id))
+            .validate(String(req.body.job_id), String(req.body.asset))
             .then((verdict) => res.json(verdict))
             .catch((err) =>
                 res.status(502).json({ error: err instanceof Error ? err.message : 'error' }),

@@ -191,7 +191,13 @@ export class SchedulerEngine {
                 return;
             }
 
-            const call = await callEvalEngine(engine.url, buildPayload(job_id, result));
+            // Score against the asset + start price captured at delivery (intake
+            // recorded these in the scheduler when the job validated).
+            const start = await this.#dl.jobScheduler.getStart(job_id);
+            const call = await callEvalEngine(
+                engine.url,
+                buildPayload(job_id, result, start?.asset ?? '', start?.data ?? {}),
+            );
             if (call.ok) {
                 const ev = call.body as EvalResponse;
                 if (engine.enclaveId) {

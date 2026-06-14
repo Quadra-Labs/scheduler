@@ -44,7 +44,7 @@ async function main(): Promise<void> {
     const agentHex = 'ab'.repeat(32);
     const data = {
         agent_id: Array.from(fromHex(agentHex)),
-        category_id: 'btc-price-guess',
+        category_id: 'price-range-guess',
         job_id: 'job-1',
         score: 100,
         finalized_price: 60050n,
@@ -62,7 +62,7 @@ async function main(): Promise<void> {
         timestamp_ms: responseInner.timestamp_ms,
         data: {
             agent_id: `0x${agentHex}`,
-            category_id: 'btc-price-guess',
+            category_id: 'price-range-guess',
             job_id: 'job-1',
             score: 100,
             finalized_price: 60050,
@@ -108,11 +108,14 @@ async function main(): Promise<void> {
         job: {
             lifetime: '5m',
             template: {
-                id: 'btc_price_5m',
+                id: 'price_range_5m',
                 category: 'finance',
                 description: '',
                 output: { minPrice: 'number', maxPrice: 'number' },
-                evaluator_id: 'btc-price-guess',
+                evaluator_id: 'price-range-guess',
+                start_data_template: { start_price: 'number' },
+                minimum_lifetime: 60_000,
+                allowed_assets: ['BTC'],
             },
         },
         agent_result: { minPrice: 60000, maxPrice: 60100 },
@@ -121,12 +124,13 @@ async function main(): Promise<void> {
         started_at: 1_700_000_000_000,
         delivered_at: 1_700_000_060_000,
     } as unknown as JobResult;
-    const p = buildPayload('job-1', result).payload;
-    check('payload category_id = evaluator_id', p.category_id === 'btc-price-guess');
+    const p = buildPayload('job-1', result, 'BTC', { start_price: 6_000_000_000_000 }).payload;
+    check('payload category_id = evaluator_id', p.category_id === 'price-range-guess');
     check(
         'payload job_template is {output,lifetime}',
         JSON.stringify(Object.keys(p.job_template).sort()) === '["lifetime","output"]',
     );
+    check('payload carries asset + start_data', p.asset === 'BTC' && !!p.start_data);
     check(
         'payload carries timestamps',
         p.started_at_ms === 1_700_000_000_000 && p.delivered_at_ms === 1_700_000_060_000,
