@@ -26,10 +26,13 @@ intake can release payment.
    fault → failure only (no score change).
 4. Remove the job from `job_scheduler`. Outcomes are exposed at `/status`.
 
-Eval engines are configured by `EVAL_ENGINES` (a JSON map
-`evaluator_id → {url, enclave_id?}`). One enclave serves one `evaluator_id`
-(= the enclave's `category_id`); many templates can share it. Omit `enclave_id`
-for local dev to skip signature verification. Unit test: `npm run test:eval`.
+Eval engines are loaded dynamically from the Walrus `eval_engines` catalog
+(`POINTER_EVAL_ENGINES` in `../data/.env`). Register each evaluator after deploy
+with `npm run register-eval-engine` in the data package (or `PUT /eval-engines/:id`
+via the gateway). One enclave serves one `evaluator_id` (= the enclave's
+`category_id`); many templates can share it. Omit `enclave_id` for local dev to
+skip signature verification. Deprecated: set `EVAL_ENGINES` in env to overlay entries
+for local dev without gateway writes. Unit test: `npm run test:eval`.
 
 ## How it watches
 
@@ -76,8 +79,8 @@ npm start                        # Express on SCHEDULER_PORT (default 4000)
 Config comes from `../data/.env` (shared with the data layer); plus `SCHEDULER_PORT`,
 `SCHEDULER_POLL_MS`, `INTAKE_INTERNAL_TOKEN` (**required**, must match intake),
 `SCHEDULER_SECRET_KEY` (**required** — the dedicated Seal-reader key), the gateway
-(`DATA_GATEWAY_URL`, `ROLE_TOKEN_SCHEDULER`), and `EVAL_ENGINES`. Keep `/validate`
-on a private network.
+(`DATA_GATEWAY_URL`, `ROLE_TOKEN_SCHEDULER`). Ensure eval engines are registered in
+the Walrus catalog (`POINTER_EVAL_ENGINES`). Keep `/validate` on a private network.
 
 Endpoints: `GET /health`, `GET /status` (in-memory jobs + fired log + refresh
 counters + validator status), `GET /fired`.

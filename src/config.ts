@@ -31,17 +31,6 @@ export interface SchedulerConfig {
     gatewayUrl: string;
     /** Scheduler's gateway role token (`ROLE_TOKEN_SCHEDULER`). */
     roleToken: string;
-    /** evaluator_id -> evaluation engine (one enclave per evaluator_id). */
-    evalEngines: Map<string, EvalEngine>;
-}
-
-/** Where to reach (and how to verify) one evaluation engine. */
-export interface EvalEngine {
-    /** Base URL of the enclave / its backend (POST /process_data). */
-    url: string;
-    /** On-chain `enclave::Enclave` object id. Omit to skip signature verification
-     * (local dev). */
-    enclaveId?: string;
 }
 
 function num(name: string, fallback: number): number {
@@ -66,28 +55,7 @@ export function loadSchedulerConfig(): SchedulerConfig {
         schedulerKey: Ed25519Keypair.fromSecretKey(required('SCHEDULER_SECRET_KEY')),
         gatewayUrl: process.env.DATA_GATEWAY_URL ?? 'http://localhost:8787',
         roleToken: required('ROLE_TOKEN_SCHEDULER'),
-        evalEngines: loadEvalEngines(),
     };
-}
-
-/** Parse `EVAL_ENGINES` (a JSON object `evaluator_id -> { url, enclave_id? }`). */
-function loadEvalEngines(): Map<string, EvalEngine> {
-    const raw = process.env.EVAL_ENGINES;
-    if (!raw) return new Map();
-    let parsed: Record<string, { url: string; enclave_id?: string }>;
-    try {
-        parsed = JSON.parse(raw);
-    } catch (error) {
-        throw new Error(
-            `EVAL_ENGINES is not valid JSON: ${error instanceof Error ? error.message : error}`,
-        );
-    }
-    return new Map(
-        Object.entries(parsed).map(([id, e]) => [
-            id,
-            { url: e.url, ...(e.enclave_id ? { enclaveId: e.enclave_id } : {}) },
-        ]),
-    );
 }
 
 /** Read-only data layer (no master key); the scheduler reads + decrypts only. */

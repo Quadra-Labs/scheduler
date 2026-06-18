@@ -2,7 +2,8 @@ import { SuiJsonRpcClient, getJsonRpcFullnodeUrl } from '@mysten/sui/jsonRpc';
 import type { Signer } from '@mysten/sui/cryptography';
 import type { DataLayer, GatewayClient, PointerWatcher } from 'quadra-data';
 
-import type { EvalEngine } from './config.js';
+import type { EvalEngineLookup } from 'quadra-data';
+
 import {
     buildPayload,
     callEvalEngine,
@@ -38,8 +39,8 @@ export interface SchedulerEngineOptions {
     gateway: GatewayClient;
     /** The dedicated Seal-reader key (registered via `job_access::set_scheduler`). */
     schedulerKey: Signer;
-    /** evaluator_id -> evaluation engine. */
-    evalEngines: Map<string, EvalEngine>;
+    /** evaluator_id -> evaluation engine (dynamic Walrus catalog). */
+    evalEngines: EvalEngineLookup;
     /** Override the on-chain `Enclave.pk` read (testing only). */
     fetchEnclavePk?: (enclaveId: string) => Promise<Uint8Array>;
 }
@@ -57,7 +58,7 @@ export class SchedulerEngine {
     #pollMs: number;
     #gateway: GatewayClient;
     #schedulerKey: Signer;
-    #evalEngines: Map<string, EvalEngine>;
+    #evalEngines: EvalEngineLookup;
     #fetchEnclavePkOverride: ((enclaveId: string) => Promise<Uint8Array>) | undefined;
     #sui: SuiJsonRpcClient;
     #pointerId: string;

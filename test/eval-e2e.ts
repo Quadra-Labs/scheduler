@@ -22,7 +22,7 @@ import * as ed25519 from '@noble/ed25519';
 setGlobalDispatcher(new Agent({ connect: { timeout: 60_000, family: 4 } }));
 
 import { DataLayer, GatewayClient } from 'quadra-data';
-import type { JobResult } from 'quadra-data';
+import type { EvalEngineLookup, JobResult } from 'quadra-data';
 import { SchedulerEngine } from '../src/index.js';
 
 process.loadEnvFile(fileURLToPath(new URL('../../data/.env', import.meta.url)));
@@ -215,6 +215,13 @@ async function main(): Promise<void> {
         await dlWrite.jobScheduler.set(jobId, now - 1000);
 
         // Run the engine in-process so we can inject the enclave pk (verify path).
+        const mockEngines = new Map([
+            ['mock', { url: `http://localhost:${MOCK_PORT}`, enclaveId: 'test' }],
+        ]);
+        const evalEngines: EvalEngineLookup = {
+            get: (id) => mockEngines.get(id),
+            size: () => mockEngines.size,
+        };
         engine = new SchedulerEngine(dlRead, {
             pollMs: 2000,
             gateway: new GatewayClient({
@@ -222,9 +229,7 @@ async function main(): Promise<void> {
                 roleToken: ROLE_TOKEN,
             }),
             schedulerKey,
-            evalEngines: new Map([
-                ['mock', { url: `http://localhost:${MOCK_PORT}`, enclaveId: 'test' }],
-            ]),
+            evalEngines,
             fetchEnclavePk: async () => mockPub, // verify the real signature against the mock key
         });
         await engine.start();

@@ -1,7 +1,8 @@
 import type { Signer } from '@mysten/sui/cryptography';
 import type { DataLayer } from 'quadra-data';
 
-import type { EvalEngine } from './config.js';
+import type { EvalEngineLookup } from 'quadra-data';
+
 import { buildPayload, callEvalValidate, callEvalStartData } from './evaluation.js';
 
 export interface ValidatorOptions {
@@ -9,7 +10,7 @@ export interface ValidatorOptions {
      * layer's master write key. */
     schedulerKey: Signer;
     /** evaluator_id -> evaluation engine (shared with the scheduler engine). */
-    evalEngines: Map<string, EvalEngine>;
+    evalEngines: EvalEngineLookup;
 }
 
 export interface ValidatorStatus {
