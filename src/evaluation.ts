@@ -41,6 +41,7 @@ const IntentMessage = bcs.struct('IntentMessage', {
 
 /** Build the `process_data` payload from a decrypted job result. */
 export function buildPayload(jobId: string, result: JobResult) {
+    const isPrediction = result.job.template.category === 'prediction';
     return {
         payload: {
             agent_id: result.agent,
@@ -53,6 +54,10 @@ export function buildPayload(jobId: string, result: JobResult) {
             },
             started_at_ms: result.started_at,
             delivered_at_ms: result.delivered_at,
+            // Prediction evaluators (polymarket-*) resolve ground truth from these fixed params
+            // (market_id / target_ts / event_id), not from a Pyth asset, so forward them. Finance
+            // jobs omit params and the evaluator reads `asset` instead.
+            ...(isPrediction ? { params: result.params ?? {} } : {}),
         },
     };
 }
