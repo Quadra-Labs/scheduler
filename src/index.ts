@@ -17,4 +17,5 @@ export {
 } from './evaluation.js';
 export type { EvalResponse, ScoreData, EvalCallResult } from './evaluation.js';
 export { loadSchedulerConfig, createDataLayer, createGateway } from './config.js';
-export type { SchedulerConfig, EvalEngine } from './config.js';
+export type { SchedulerConfig } from './config.js';
+export type { EvalEngineLookup, ResolvedEvalEngine } from 'quadra-data';

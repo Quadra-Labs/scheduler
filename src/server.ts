@@ -12,6 +12,7 @@ import { timingSafeEqual } from 'node:crypto';
 import express from 'express';
 
 import { createDataLayer, createGateway, loadSchedulerConfig } from './config.js';
+import { createEvalEngineRegistry } from 'quadra-data';
 import { SchedulerEngine } from './engine.js';
 import { ValidatorEngine } from './validator.js';
 
@@ -26,17 +27,20 @@ function tokenMatches(provided: string | undefined, expected: string): boolean {
 async function main(): Promise<void> {
     const config = loadSchedulerConfig();
     const dl = createDataLayer();
+    const evalEngines = createEvalEngineRegistry(dl);
+    await evalEngines.start();
+
     const engine = new SchedulerEngine(dl, {
         pollMs: config.pollMs,
         gateway: createGateway(config),
         schedulerKey: config.schedulerKey,
-        evalEngines: config.evalEngines,
+        evalEngines,
     });
     await engine.start();
 
     const validator = new ValidatorEngine(dl, {
         schedulerKey: config.schedulerKey,
-        evalEngines: config.evalEngines,
+        evalEngines,
     });
 
     const app = express();
@@ -51,7 +55,7 @@ async function main(): Promise<void> {
             return;
         }
         validator
-            .validate(String(req.body.job_id))
+            .validate(String(req.body.job_id), String(req.body.asset))
             .then((verdict) => res.json(verdict))
             .catch((err) =>
                 res.status(502).json({ error: err instanceof Error ? err.message : 'error' }),

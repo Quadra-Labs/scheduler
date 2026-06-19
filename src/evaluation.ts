@@ -39,8 +39,15 @@ const IntentMessage = bcs.struct('IntentMessage', {
     data: ScoreResult,
 });
 
-/** Build the `process_data` payload from a decrypted job result. */
-export function buildPayload(jobId: string, result: JobResult) {
+/** Build the `process_data` / `validate` payload from a decrypted job result.
+ * `asset` is the job's chosen asset; `startData` (the price captured at delivery)
+ * is only needed for scoring (`process_data`), not validation. */
+export function buildPayload(
+    jobId: string,
+    result: JobResult,
+    asset: string,
+    startData: Record<string, unknown> = {},
+) {
     const isPrediction = result.job.template.category === 'prediction';
     return {
         payload: {
@@ -54,6 +61,8 @@ export function buildPayload(jobId: string, result: JobResult) {
             },
             started_at_ms: result.started_at,
             delivered_at_ms: result.delivered_at,
+            asset,
+            start_data: startData,
             // Prediction evaluators (polymarket-*) resolve ground truth from these fixed params
             // (market_id / target_ts / event_id), not from a Pyth asset, so forward them. Finance
             // jobs omit params and the evaluator reads `asset` instead.
@@ -91,6 +100,26 @@ export async function callEvalValidate(
     const reason = await res.text();
     if (res.status === 400) return { valid: false, reason };
     throw new Error(`eval /validate -> ${res.status} ${reason}`);
+}
+
+/**
+ * Ask an evaluation engine for the start data of an asset at `atMs` (the delivery
+ * moment), via `POST /start_data`. Returns the `start_data` object (e.g.
+ * `{ start_price }`). Throws on any non-200 so the caller can retry.
+ */
+export async function callEvalStartData(
+    url: string,
+    asset: string,
+    atMs: number,
+): Promise<Record<string, unknown>> {
+    const res = await fetch(`${url.replace(/\/$/, '')}/start_data`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ payload: { asset, at_ms: atMs } }),
+    });
+    if (!res.ok) throw new Error(`eval /start_data -> ${res.status} ${await res.text()}`);
+    const body = (await res.json()) as { start_data: Record<string, unknown> };
+    return body.start_data;
 }
 
 function agentIdBytes(agent: string | number[]): number[] {
