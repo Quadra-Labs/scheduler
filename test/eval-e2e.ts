@@ -14,7 +14,9 @@ import { fileURLToPath } from 'node:url';
 
 import { Agent, setGlobalDispatcher } from 'undici';
 import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
-import { Transaction } from '@mysten/sui/transactions';
+// Use quadra-data's re-exported Transaction so this tx matches dl.clients.sui's @mysten/sui copy
+// (a file:-linked consumer's own @mysten/sui would be a different physical copy and clash).
+import { Transaction } from 'quadra-data';
 import { bcs } from '@mysten/sui/bcs';
 import { fromHex, toHex } from '@mysten/sui/utils';
 import * as ed25519 from '@noble/ed25519';
