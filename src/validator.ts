@@ -75,8 +75,14 @@ export class ValidatorEngine {
             return verdict;
         }
 
-        // Snapshot the start price at delivery (the job's started_at moment).
-        const start_data = await callEvalStartData(engine.url, asset, result.started_at);
+        // Snapshot the start price at delivery (the job's started_at moment) for FINANCE jobs only.
+        // Prediction jobs (polymarket-*) resolve from fixed params (market_id / target_ts /
+        // event_id), not a start price — the polymarket evaluator has no /start_data endpoint, so
+        // calling it 404s and would wrongly fail delivery. A prediction job's start_data is {}.
+        const isPrediction = result.job.template.category === 'prediction';
+        const start_data = isPrediction
+            ? {}
+            : await callEvalStartData(engine.url, asset, result.started_at);
         this.#counts.validated++;
         console.log(`[validator] ${jobId} valid; start_data ${JSON.stringify(start_data)}`);
         return { valid: true, start_data };
