@@ -158,10 +158,17 @@ export async function verifyScoreSignature(
 /**
  * Classify an eval-engine rejection (HTTP 400 message). `'agent'` means the
  * agent is at fault (score 0); `'engine'` means an engine/oracle/config problem
- * (no score change).
+ * (no score change). Kept in sync with competition/src/evaluation.ts: the patterns
+ * must cover EVERY merged-engine agent-fault string — including the prediction
+ * (`invalid guess` / `unknown market`) and portfolio (`empty portfolio` /
+ * `unknown asset` / `insufficient`) ones — or a paid prediction/finance job with a
+ * malformed result is misread as a transient engine fault and silently dropped
+ * instead of being scored 0.
  */
 export function classifyEvalError(message: string): 'agent' | 'engine' {
-    return /too late|before started_at|missing field|not of type|valid sui address/i.test(message)
+    return /too late|before started_at|missing field|not of type|valid sui address|empty portfolio|unknown asset|insufficient|invalid guess|unknown market/i.test(
+        message,
+    )
         ? 'agent'
         : 'engine';
 }
