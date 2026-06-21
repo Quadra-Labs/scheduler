@@ -59,7 +59,20 @@ export class ValidatorEngine {
      * can retry.
      */
     async validate(jobId: string, asset: string): Promise<Verdict> {
-        const result = await this.#dl.jobResults.decrypt(jobId, this.#opts.schedulerKey);
+        console.log(`[validator] validate ${jobId} (asset=${asset || '(none)'})`);
+        // Transient failures here (rethrown so intake retries): result not registered yet, Seal
+        // key-server outage, or a Seal no_access/decrypt failure. This is the silent gap that looks
+        // like "paid but refunded non-delivered" — log it so the real cause is visible.
+        const result = await this.#dl.jobResults
+            .decrypt(jobId, this.#opts.schedulerKey)
+            .catch((error: unknown) => {
+                console.error(
+                    `[validator] ${jobId} decrypt failed (will be retried):`,
+                    error instanceof Error ? error.message : error,
+                );
+                throw error;
+            });
+        console.log(`[validator] ${jobId} decrypted; evaluator=${result.job.template.evaluator_id}`);
 
         const evaluatorId = result.job.template.evaluator_id;
         const engine = this.#opts.evalEngines.get(evaluatorId);
