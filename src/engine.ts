@@ -11,6 +11,7 @@ import {
     verifyScoreSignature,
     type EvalResponse,
 } from './evaluation.js';
+import { resolveRpcUrl, retryingRpcTransport, withRetry } from './rpcRetry.js';
 
 export type Outcome = 'scored' | 'failed' | 'eval_error' | 'no_engine' | 'not_delivered';
 
@@ -81,12 +82,12 @@ export class SchedulerEngine {
         this.#pointerId = dl.config.pointers.job_scheduler;
         this.#sui = new SuiJsonRpcClient({
             network: dl.config.network,
-            url: process.env.DATA_BASE_URL ?? getJsonRpcFullnodeUrl(dl.config.network),
+            transport: retryingRpcTransport(resolveRpcUrl(getJsonRpcFullnodeUrl(dl.config.network))),
         });
     }
 
     async start(): Promise<void> {
-        const state = await this.#dl.clients.wj.readPointer(this.#pointerId);
+        const state = await withRetry(() => this.#dl.clients.wj.readPointer(this.#pointerId));
         this.#lastVersion = state.version;
         await this.#refresh(state.version, 'init');
 
@@ -124,7 +125,7 @@ export class SchedulerEngine {
 
     async #tick(): Promise<void> {
         try {
-            const state = await this.#dl.clients.wj.readPointer(this.#pointerId);
+            const state = await withRetry(() => this.#dl.clients.wj.readPointer(this.#pointerId));
             await this.#onNewVersion(state.version, 'poll');
         } catch (error) {
             console.error(
