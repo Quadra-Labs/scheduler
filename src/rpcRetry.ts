@@ -69,7 +69,10 @@ export function isTransient(error: unknown): boolean {
     const status = (error as { status?: number } | null)?.status;
     if (typeof status === 'number') return RETRYABLE_STATUS.has(status);
     const message = error instanceof Error ? error.message : String(error);
-    return /(Unexpected status code|validator responded):? (429|502|503|504)|fetch failed|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|socket hang up|terminated|network error/i.test(
+    // The eval engine surfaces a momentary oracle/DNS blip as a 400 carrying a reqwest-style
+    // message (`oracle fetch failed ... error trying to connect: dns error ...`), so match those
+    // shapes too — the start price is oracle-derived, never agent-dependent, so retrying is safe.
+    return /(Unexpected status code|validator responded):? (429|502|503|504)|fetch failed|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|socket hang up|terminated|network error|oracle fetch failed|oracle request failed|error sending request for url|error trying to connect|dns error/i.test(
         message,
     );
 }

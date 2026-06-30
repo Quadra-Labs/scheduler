@@ -4,6 +4,7 @@ import type { DataLayer } from 'quadra-data';
 import type { EvalEngineLookup } from 'quadra-data';
 
 import { buildPayload, callEvalValidate, callEvalStartData } from './evaluation.js';
+import { withRetry } from './rpcRetry.js';
 
 export interface ValidatorOptions {
     /** Dedicated Seal-reader key (the `set_scheduler` address), not the data
@@ -93,9 +94,22 @@ export class ValidatorEngine {
         // event_id), not a start price — the polymarket evaluator has no /start_data endpoint, so
         // calling it 404s and would wrongly fail delivery. A prediction job's start_data is {}.
         const isPrediction = result.job.template.category === 'prediction';
+        // The start price is oracle-derived (the eval engine fetches Pyth at delivery), so a
+        // momentary oracle/DNS/upstream blip is transient — retry locally with a slightly longer
+        // profile rather than bubbling a 502 that intake retries until the job ages out. A genuine
+        // (non-transient) 400 still throws on the first attempt, unchanged.
         const start_data = isPrediction
             ? {}
-            : await callEvalStartData(engine.url, asset, result.started_at);
+            : await withRetry(() => callEvalStartData(engine.url, asset, result.started_at), {
+                  maxAttempts: 6,
+                  baseDelayMs: 500,
+                  maxDelayMs: 8000,
+                  onRetry: (attempt, error) =>
+                      console.warn(
+                          `[validator] ${jobId} start_data transient failure (attempt ${attempt}), retrying:`,
+                          error instanceof Error ? error.message : error,
+                      ),
+              });
         this.#counts.validated++;
         console.log(`[validator] ${jobId} valid; start_data ${JSON.stringify(start_data)}`);
         return { valid: true, start_data };
